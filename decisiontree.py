@@ -17,66 +17,66 @@
 
 # a map of category names to a map of attributes with values (nested dictionary)
 
+import queue as queue
+import random
+import splitting_metrics
+
+
 class Node(object):
 
     def __init__(self, val):
-        self.connections = {}
-        self.v = val
+        self.children = []
+        self.value = val
+
+    def __repr__(self, level=0):
+        ret = "\t"*level+repr(self.value)+"\n"
+        for child in self.children:
+            ret += child.__repr__(level+1)
+        return ret
 
 
 class TreeClassifier(object):
 
-    def __init__(self, attribute_list, categories_tags_dict, max_depth):
+    def __init__(self, attribute_list, categories_tags_dict, max_depth, split_metric=splitting_metrics.even_split_metric):
         self.max_depth = max_depth
         self.attribute_set = attribute_list
         self.categories_tags = categories_tags_dict
-        self.root = self.induct_tree(self, self.attribute_set.copy(), self.categories_tags_dict)
+        self.split_metric = split_metric
+        self.root = self.induct_tree(self.attribute_set.copy(), self.categories_tags)
+        print(split_metric)
 
-
-    def gini_index_metric(self, attribute_list, categories_tags_dict, threshold, right, left):
-        # compute the best metric
-        attribute_tag_score = {}
-        best_tag = None
-        best_freq = None
-
-        for tag_value_map in categories_tags_dict.values():
-
-            distance = 0.5 *len(categories_tags_dict.keys())
-
-            for tag in attribute_list:
-                if tag_value_map[tag] > threshold:
-                    if tag in tag_value_map:
-                        attribute_tag_score[tag] += 1
-                    else:
-                        attribute_tag_score[tag] = 1
-
-
-        for tag, frequency in attribute_tag_score:
-            if (best_tag == None) or (abs(best_freq - distance) < abs(frequency - distance)):
-                best_freq = frequency
-                best_tag = tag
-
-        for category, tag_value_map in categories_tags_dict:
-            if tag_value_map[best_tag] > threshold:
-                left.append({category :tag_value_map})
-            else:
-                right.append({category :tag_value_map})
-
-        return Node(best_tag)
 
     def induct_tree(self, attribute_list, categories_tags_dict):
-        if len(self.attribute_set) - len(attribute_list) >= self.max_depth:  # choose an arbitrary category
-            return Node(categories_tags_dict.keys[range(len(categories_tags_dict.keys))])
-        elif len(categories_tags_dict) == 1:
-            return Node(categories_tags_dict.keys[0])  # make the category the root
+        if len(categories_tags_dict.keys()) == 0:
+            return Node("EMPTY")
+        if len(categories_tags_dict) == 1:
+            return Node(list(categories_tags_dict.keys())[0])  # make the category the root
+        elif len(attribute_list) == 0 or len(self.attribute_set) - len(attribute_list) >= self.max_depth - 1:  # choose an arbitrary category
+            return Node(random.choice(list(categories_tags_dict.keys())))
         else:
-            right, left = {}
-            newNode = Node(self.gini_index_metric(self, attribute_list, categories_tags_dict, 0.5, right, left))
+            right = {}
+            left = {}
+            new_node = Node(self.split_metric(attribute_list, categories_tags_dict, 0.5, right, left))
 
-            attribute_list.remove(newNode.v)
-            newNode.connections.add(self.induct_tree(self, attribute_list, left ))
-            newNode.connections.add(self.induct_tree(self, attribute_list, right))
-            newNode.connections.add(self.induct_tree(self, attribute_list, categories_tags_dict))
+            list_copy = attribute_list.copy()
+            # print(str(attribute_list))
+            # print(str(new_node.v))
+            # print(list_copy)
+            list_copy.remove(new_node.value)
 
-            return newNode
+            new_node.children.append(self.induct_tree(list_copy, left))
+            new_node.children.append(self.induct_tree(list_copy, right))
+            new_node.children.append(self.induct_tree(list_copy, categories_tags_dict))
+
+            return new_node
+
+
+    def print_tree(self):
+        print(self.root)
+
+
+
+
+
+
 
